@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UEPowe Mistrzostwa Wikipedii</title>
+    <style>
+        :root { --primary: #ffffff; --accent: #002d02; } 
+        body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background: #f9f9f9; color: #333; }
+        h1 { text-align: center; color: var(--primary); border-bottom: 3px solid var(--accent); padding-bottom: 10px; }
+        
+        .box { background: rgb(72, 72, 72); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
+        
+        button { background: var(--primary); color: rgb(0, 77, 3); border: none; padding: 10px 25px; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        button:hover { background: #004a94; transform: translateY(-2px); }
+        
+        .draw-container { font-size: 1.2em; line-height: 1.6; }
+        .draw-container a { color: var(--primary); text-decoration: none; font-weight: bold; border-bottom: 1px solid var(--accent); }
+
+        .input-group { display: flex; gap: 10px; justify-content: center; margin-top: 15px; flex-wrap: wrap; }
+        input { padding: 10px; border: 1px solid #ccc; border-radius: 5px; outline: none; }
+
+        .league-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .league-table th { background-color: var(--primary); color: white; padding: 15px; text-align: left; }
+        .league-table td { border-bottom: 1px solid #eee; padding: 12px 15px; }
+        .league-table tr:hover { background-color: #f1f1f1; }
+        .rank { font-weight: bold; color: var(--accent); width: 40px; }
+    </style>
+</head> 
+<body>
+
+    <h1>🏆 UEPowe Mistrzostwa Wikipedii</h1>
+
+    <div class="box">
+        <div class="draw-container">
+            <button onclick="drawArticles()">🎲 Losuj Wyzwanie</button>
+            <div id="articles" style="margin-top:20px;">
+                <i>Kliknij przycisk, aby wylosować trasę...</i>
+            </div>
+        </div>
+    </div>
+
+    <div class="box">
+        <h3>Dodaj swój wynik</h3>
+        <div class="input-group">
+            <input type="text" id="nick" placeholder="Twój Nick">
+            <input type="number" id="score" placeholder="Liczba punktów">
+            <button onclick="addResult()" style="background: #28a745;">Zapisz wynik</button>
+        </div>
+    </div>
+
+    <table class="league-table">
+        <thead>
+            <tr>
+                <th class="rank">#</th>
+                <th>Osoba</th>
+                <th>Trasa (Start → Meta)</th>
+                <th>Punkty</th>
+            </tr>
+        </thead>
+        <tbody id="tableBody">
+            </tbody>
+    </table>
+
+    <script>
+        let currentArticles = ["?","?"];
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwihWUexxHIssSlb1Evt3LDm3tpUcwvFJi5S04Ly51Xg48ehjzBHnMkgt-r8b0HMjuV/exec";
+
+        async function drawArticles() {
+            const btn = event.target;
+            btn.innerText = "Losowanie...";
+            try {
+                const res = await fetch("https://pl.wikipedia.org/w/api.php?action=query&format=json&list=random&rnlimit=2&rnnamespace=0&origin=*");
+                const data = await res.json();
+                currentArticles = data.query.random.map(a => a.title);
+                document.getElementById('articles').innerHTML = 
+                    `📍 <b>Start:</b> <a href="https://pl.wikipedia.org/wiki/${currentArticles[0]}" target="_blank">${currentArticles[0]}</a> <br> 
+                     🏁 <b>Meta:</b> <a href="https://pl.wikipedia.org/wiki/${currentArticles[1]}" target="_blank">${currentArticles[1]}</a>`;
+            } finally {
+                btn.innerText = "🎲 Losuj Wyzwanie";
+            }
+        }
+
+        async function addResult() {
+            const nick = document.getElementById('nick').value;
+            const score = document.getElementById('score').value;
+            
+            if(!nick || !score) return alert("Wpisz nick i wynik!");
+            if(currentArticles[0] === "?") return alert("Najpierw wylosuj artykuły!");
+
+            const payload = {
+                nick: nick,
+                score: parseInt(score),
+                start: currentArticles[0],
+                meta: currentArticles[1]
+            };
+
+            try {
+                
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    body: JSON.stringify(payload)
+                });
+                
+                alert("Wynik wysłany! (Odświeżenie tabeli może zająć chwilę)");
+                document.getElementById('score').value = "";
+                setTimeout(loadTable, 1500); // Małe opóźnienie dla Google Sheets
+            } catch(e) {
+                alert("Błąd wysyłania: " + e);
+            }
+        }
+
+        async function loadTable() {
+            try {
+                const res = await fetch(SCRIPT_URL);
+                let data = await res.json();
+                
+                // Sortowanie: najwyższe wyniki na górze
+                data.sort((a, b) => b[4] - a[4]); 
+
+                let rows = "";
+                data.forEach((r, index) => {
+                    rows += `<tr>
+                        <td class="rank">${index + 1}</td>
+                        <td>${r[1]}</td>
+                        <td><small>${r[2]} ➔ ${r[3]}</small></td>
+                        <td><b>${r[4]}</b></td>
+                    </tr>`;
+                });
+                document.getElementById('tableBody').innerHTML = rows;
+            } catch(e) {
+                document.getElementById('tableBody').innerHTML = "<tr><td colspan='4'>Ładowanie wyników...</td></tr>";
+            }
+        }
+
+        window.onload = loadTable;
+    </script>
+</body>
+</html>
