@@ -7,30 +7,20 @@
     <style>
         :root { --primary: #004a0b; --accent: #e6a500; --bg: #f4f7f6; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        
         .container { max-width: 900px; width: 100%; }
         h1 { color: var(--primary); text-align: center; text-transform: uppercase; letter-spacing: 2px; border-bottom: 4px solid var(--accent); padding-bottom: 10px; }
-        
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
-        
         button { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.3s ease; }
         button:hover { background: #003308; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        
         .draw-results { margin-top: 20px; font-size: 1.1em; line-height: 1.8; color: #444; }
         .draw-results a { color: var(--primary); text-decoration: none; font-weight: bold; padding: 2px 5px; background: rgba(230, 165, 0, 0.2); border-radius: 4px; }
-
-        .timer-badge { font-size: 1.5em; font-weight: bold; color: var(--accent); margin: 10px 0; display: block; }
-
+        .timer-badge { font-size: 1.8em; font-weight: bold; color: var(--accent); margin: 15px 0; display: block; }
         .input-group { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; align-items: center; }
         input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 160px; font-size: 14px; }
         input[readonly] { background-color: #eee; cursor: not-allowed; }
-        input:focus { border-color: var(--primary); outline: none; }
-
         .league-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 20px; }
         .league-table th { background-color: var(--primary); color: white; padding: 15px; text-align: left; }
         .league-table td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 14px; }
-        .league-table tr:nth-child(even) { background-color: #fafafa; }
-        
         .rank { font-weight: bold; color: var(--accent); width: 40px; text-align: center; }
         .loading { font-style: italic; color: #888; margin: 20px; text-align: center; }
     </style>
@@ -43,34 +33,34 @@
         <div class="card">
             <button onclick="drawArticles()" id="drawBtn">🎲 Losuj nową trasę</button>
             <div id="articles" class="draw-results">
-                <i>Kliknij przycisk, aby wylosować wyzwanie...</i>
+                <i>Zacznij Mistrzostwa! Wylosuj trasę...</i>
             </div>
             <span id="timerDisplay" class="timer-badge">0m 0s</span>
         </div>
 
         <div class="card">
-            <h3>Dodaj swój wynik</h3>
+            <h3>Zapisz wynik biegu</h3>
             <div class="input-group">
                 <input type="text" id="nick" placeholder="Twój Nick" required>
                 <input type="number" id="clicks" placeholder="Liczba kliknięć" required>
                 <input type="text" id="timeScore" placeholder="Czas" readonly>
-                <button onclick="addResult()" style="background-color: #28a745;">Zapisz wynik</button>
+                <button onclick="addResult()" style="background-color: #28a745;">🚀 Wyślij</button>
             </div>
         </div>
 
         <table class="league-table">
             <thead>
                 <tr>
-                    <th class="rank">#</th>
+                    <th class="rank">Pkt</th>
                     <th>Gracz</th>
                     <th>Kliknięcia</th>
                     <th>Czas</th>
-                    <th>Trasa</th>
+                    <th>Trasa (Start ➔ Meta)</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
-        <div id="loader" class="loading" style="display:none;">Aktualizowanie tabeli...</div>
+        <div id="loader" class="loading" style="display:none;">Aktualizowanie rankingów...</div>
     </div>
 
     <script>
@@ -78,9 +68,9 @@
         let startTime;
         let timerInterval;
         
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyu9H4DnXmXNtHTJzwXQ2vC4CJtT3p-BY9KG52SRjL26UVV2E5z-OFqmWkcm8naD3eM/exec";
+        // --- WKLEJ TUTAJ SWÓJ SCRIPT_URL ---
+        const SCRIPT_URL = "TWÓJ_URL_Z_GOOGLE_APPS_SCRIPT";
 
-        // Inicjalizacja: załaduj tabelę i sprawdź czy gra trwa
         window.onload = function() {
             loadTable();
             const saved = localStorage.getItem('wikiGameState');
@@ -106,26 +96,19 @@
                 const res = await fetch("https://pl.wikipedia.org/w/api.php?action=query&format=json&list=random&rnlimit=2&rnnamespace=0&origin=*");
                 const data = await res.json();
                 currentArticles = data.query.random.map(a => a.title);
-                
                 updateDisplay();
-                
                 startTime = Date.now();
                 localStorage.setItem('wikiGameState', JSON.stringify({ articles: currentArticles, startTime: startTime }));
                 startTimerLogic();
-            } catch (e) {
-                alert("Błąd API Wikipedii.");
-            } finally {
-                btn.innerText = "🎲 Losuj nową trasę";
-            }
+            } catch (e) { alert("Błąd API Wikipedii."); }
+            finally { btn.innerText = "🎲 Losuj nową trasę"; }
         }
 
         function startTimerLogic() {
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 const diff = Math.floor((Date.now() - startTime) / 1000);
-                const mins = Math.floor(diff / 60);
-                const secs = diff % 60;
-                const timeStr = `${mins}m ${secs}s`;
+                const timeStr = `${Math.floor(diff / 60)}m ${diff % 60}s`;
                 document.getElementById('timerDisplay').innerText = timeStr;
                 document.getElementById('timeScore').value = timeStr;
             }, 1000);
@@ -136,27 +119,20 @@
             const clicks = document.getElementById('clicks').value;
             const timeScore = document.getElementById('timeScore').value;
 
-            if (!nick || !clicks) return alert("Wypełnij nick i liczbę kliknięć!");
-            if (currentArticles[0] === "?") return alert("Najpierw wylosuj trasę!");
-
-            // Budujemy parametry zgodnie z nowym Apps Script (nick, clicks, score, start, meta)
+            if (!nick || !clicks) return alert("Wpisz nick i kliknięcia!");
+            
             const url = `${SCRIPT_URL}?nick=${encodeURIComponent(nick)}&clicks=${encodeURIComponent(clicks)}&score=${encodeURIComponent(timeScore)}&start=${encodeURIComponent(currentArticles[0])}&meta=${encodeURIComponent(currentArticles[1])}`;
 
             try {
                 await fetch(url, { method: 'GET', mode: 'no-cors' });
-                alert("Wynik został wysłany!");
-                
-                // Reset gry
+                alert("Wynik wysłany!");
                 clearInterval(timerInterval);
                 localStorage.removeItem('wikiGameState');
                 document.getElementById('clicks').value = "";
                 document.getElementById('timerDisplay').innerText = "0m 0s";
-                
                 document.getElementById('loader').style.display = "block";
-                setTimeout(loadTable, 2000);
-            } catch (e) {
-                alert("Wystąpił błąd.");
-            }
+                setTimeout(loadTable, 2500); 
+            } catch (e) { alert("Błąd wysyłania."); }
         }
 
         async function loadTable() {
@@ -164,14 +140,15 @@
                 const res = await fetch(SCRIPT_URL);
                 const data = await res.json();
                 
-                // Sortowanie: Najpierw liczba kliknięć (rosnąco), potem czas (uproszczone)
-                data.sort((a, b) => a[2] - b[2]); 
+                // Sortowanie: Najpierw po Punkcie z kolumny G (indeks 6), 
+                // jeśli puste (nowe rekordy), idą na dół.
+                data.sort((a, b) => (a[6] || 999) - (b[6] || 999));
 
                 let rows = "";
-                data.forEach((r, index) => {
-                    // r[1]: nick, r[2]: kliknięcia, r[3]: czas, r[4]: start, r[5]: meta
+                data.forEach((r) => {
+                    // r[1]: Imię, r[2]: Kliknięcia, r[3]: Czas, r[4]: Start, r[5]: Meta, r[6]: Punkty
                     rows += `<tr>
-                        <td class="rank">${index + 1}</td>
+                        <td class="rank">${r[6] || "-"}</td>
                         <td>${r[1]}</td>
                         <td><b>${r[2]}</b></td>
                         <td>${r[3]}</td>
@@ -179,11 +156,8 @@
                     </tr>`;
                 });
                 document.getElementById('tableBody').innerHTML = rows;
-            } catch (e) {
-                document.getElementById('tableBody').innerHTML = "<tr><td colspan='5'>Błąd ładowania danych.</td></tr>";
-            } finally {
-                document.getElementById('loader').style.display = "none";
-            }
+            } catch (e) { console.error("Błąd ładowania."); }
+            finally { document.getElementById('loader').style.display = "none"; }
         }
     </script>
 </body>
