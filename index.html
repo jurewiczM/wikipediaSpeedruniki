@@ -3,21 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏆 UEPowe Mistrzostwa Wikipedii</title>
+    <title>🏆 UEPowe Mistrzostwa Wikipedii - Tryb Stacjonarny</title>
     <style>
-        :root { --primary: #004a0b; --accent: #e6a500; --bg: #f4f7f6; }
+        :root { --primary: #004a0b; --accent: #e6a500; --bg: #f4f7f6; --danger: #dc3545; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { max-width: 900px; width: 100%; }
         h1 { color: var(--primary); text-align: center; text-transform: uppercase; letter-spacing: 2px; border-bottom: 4px solid var(--accent); padding-bottom: 10px; }
         .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; text-align: center; }
         button { background: var(--primary); color: white; border: none; padding: 12px 30px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.3s ease; }
         button:hover { background: #003308; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        button:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .btn-finish { background: var(--danger); margin-top: 10px; font-size: 12px; padding: 8px 15px; }
         .draw-results { margin-top: 20px; font-size: 1.1em; line-height: 1.8; color: #444; }
         .draw-results a { color: var(--primary); text-decoration: none; font-weight: bold; padding: 2px 5px; background: rgba(230, 165, 0, 0.2); border-radius: 4px; }
-        .timer-badge { font-size: 1.8em; font-weight: bold; color: var(--accent); margin: 15px 0; display: block; }
-        .input-group { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; align-items: center; }
+        .timer-badge { font-size: 2.2em; font-weight: bold; color: var(--accent); margin: 15px 0; display: block; font-family: monospace; }
+        .input-group { display: flex; gap: 10px; justify-content: center; margin-top: 20px; flex-wrap: wrap; align-items: center; background: #f9f9f9; padding: 20px; border-radius: 8px; }
         input { padding: 12px; border: 2px solid #ddd; border-radius: 8px; width: 160px; font-size: 14px; }
-        input[readonly] { background-color: #eee; cursor: not-allowed; }
+        input:focus { border-color: var(--primary); outline: none; }
+        input[readonly] { background-color: #eee; }
         .league-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-top: 20px; }
         .league-table th { background-color: var(--primary); color: white; padding: 15px; text-align: left; }
         .league-table td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 14px; }
@@ -31,20 +34,21 @@
         <h1>🏆 UEPowe Mistrzostwa Wikipedii</h1>
 
         <div class="card">
-            <button onclick="drawArticles()" id="drawBtn">🎲 Losuj nową trasę</button>
+            <button onclick="drawArticles()" id="drawBtn">🎲 Losuj nową trasę dla wszystkich</button>
             <div id="articles" class="draw-results">
-                <i>Zacznij Mistrzostwa! Wylosuj trasę...</i>
+                <i>Oczekiwanie na start zawodów...</i>
             </div>
-            <span id="timerDisplay" class="timer-badge">0m 0s</span>
+            <span id="timerDisplay" class="timer-badge">00:00</span>
+            <button onclick="resetGame()" class="btn-finish" id="resetBtn" style="display:none;">🏁 Zakończ sesję i wyzeruj</button>
         </div>
 
         <div class="card">
-            <h3>Zapisz wynik biegu</h3>
+            <h3>Kolejna osoba wpisuje wynik:</h3>
             <div class="input-group">
-                <input type="text" id="nick" placeholder="Twój Nick" required>
-                <input type="number" id="clicks" placeholder="Liczba kliknięć" required>
-                <input type="text" id="timeScore" placeholder="Czas" readonly>
-                <button onclick="addResult()" style="background-color: #28a745;">🚀 Wyślij</button>
+                <input type="text" id="nick" placeholder="Imię / Nick">
+                <input type="number" id="clicks" placeholder="Liczba kliknięć">
+                <input type="text" id="timeScore" placeholder="Czas" readonly title="Czas bierze się automatycznie z licznika">
+                <button onclick="addResult()" id="sendBtn" style="background-color: #28a745;">🚀 Zapisz wynik gracza</button>
             </div>
         </div>
 
@@ -55,60 +59,59 @@
                     <th>Gracz</th>
                     <th>Kliknięcia</th>
                     <th>Czas</th>
-                    <th>Trasa (Start ➔ Meta)</th>
+                    <th>Trasa</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
-        <div id="loader" class="loading" style="display:none;">Aktualizowanie rankingów...</div>
+        <div id="loader" class="loading" style="display:none;">Aktualizowanie tabeli...</div>
     </div>
 
     <script>
         let currentArticles = ["?", "?"];
-        let startTime;
-        let timerInterval;
+        let startTime = null;
+        let timerInterval = null;
         
-        // --- WKLEJ TUTAJ SWÓJ SCRIPT_URL ---
-        const SCRIPT_URL = "TWÓJ_URL_Z_GOOGLE_APPS_SCRIPT";
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2YQ8MWXM4w9glkMq9xAJPIwYbC2AYVrNO1CNTj2Q5hCA7J6MmnTAo7_qIGstz2ZZi/exec";
 
-        window.onload = function() {
-            loadTable();
-            const saved = localStorage.getItem('wikiGameState');
-            if (saved) {
-                const state = JSON.parse(saved);
-                currentArticles = state.articles;
-                startTime = state.startTime;
-                updateDisplay();
-                startTimerLogic();
-            }
-        };
+        window.onload = loadTable;
 
         function updateDisplay() {
             document.getElementById('articles').innerHTML = 
                 `📍 <b>Start:</b> <a href="https://pl.wikipedia.org/wiki/${encodeURIComponent(currentArticles[0])}" target="_blank">${currentArticles[0]}</a> <br> 
                  🏁 <b>Meta:</b> <a href="https://pl.wikipedia.org/wiki/${encodeURIComponent(currentArticles[1])}" target="_blank">${currentArticles[1]}</a>`;
+            document.getElementById('resetBtn').style.display = "inline-block";
         }
 
         async function drawArticles() {
+            if (startTime && !confirm("To zresetuje zegar dla wszystkich. Czy na pewno?")) return;
+
             const btn = document.getElementById('drawBtn');
             btn.innerText = "Losowanie...";
+            btn.disabled = true;
+
             try {
                 const res = await fetch("https://pl.wikipedia.org/w/api.php?action=query&format=json&list=random&rnlimit=2&rnnamespace=0&origin=*");
                 const data = await res.json();
                 currentArticles = data.query.random.map(a => a.title);
                 updateDisplay();
+                
                 startTime = Date.now();
-                localStorage.setItem('wikiGameState', JSON.stringify({ articles: currentArticles, startTime: startTime }));
                 startTimerLogic();
-            } catch (e) { alert("Błąd API Wikipedii."); }
-            finally { btn.innerText = "🎲 Losuj nową trasę"; }
+            } catch (e) { alert("Błąd połączenia z Wikipedią."); }
+            finally { 
+                btn.innerText = "🎲 Losuj nową trasę";
+                btn.disabled = false;
+            }
         }
 
         function startTimerLogic() {
             if (timerInterval) clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 const diff = Math.floor((Date.now() - startTime) / 1000);
-                const timeStr = `${Math.floor(diff / 60)}m ${diff % 60}s`;
+                const m = Math.floor(diff / 60);
+                const s = diff % 60;
+                const timeStr = `${m}m ${s}s`;
                 document.getElementById('timerDisplay').innerText = timeStr;
                 document.getElementById('timeScore').value = timeStr;
             }, 1000);
@@ -118,35 +121,53 @@
             const nick = document.getElementById('nick').value;
             const clicks = document.getElementById('clicks').value;
             const timeScore = document.getElementById('timeScore').value;
+            const sendBtn = document.getElementById('sendBtn');
 
-            if (!nick || !clicks) return alert("Wpisz nick i kliknięcia!");
-            
+            if (!nick || !clicks) return alert("Uzupełnij nick i kliknięcia!");
+            if (!startTime) return alert("Najpierw wylosuj trasę!");
+
+            sendBtn.disabled = true;
+            sendBtn.innerText = "Zapisywanie...";
+
             const url = `${SCRIPT_URL}?nick=${encodeURIComponent(nick)}&clicks=${encodeURIComponent(clicks)}&score=${encodeURIComponent(timeScore)}&start=${encodeURIComponent(currentArticles[0])}&meta=${encodeURIComponent(currentArticles[1])}`;
 
             try {
                 await fetch(url, { method: 'GET', mode: 'no-cors' });
-                alert("Wynik wysłany!");
-                clearInterval(timerInterval);
-                localStorage.removeItem('wikiGameState');
+                alert(`Wynik dla ${nick} został zapisany!`);
+                
+                // CZYŚCIMY TYLKO POLA INPUT, NIE ZATRZYMUJEMY ZEGARA
+                document.getElementById('nick').value = "";
                 document.getElementById('clicks').value = "";
-                document.getElementById('timerDisplay').innerText = "0m 0s";
+                
                 document.getElementById('loader').style.display = "block";
-                setTimeout(loadTable, 2500); 
-            } catch (e) { alert("Błąd wysyłania."); }
+                setTimeout(loadTable, 1500); 
+            } catch (e) { alert("Błąd zapisu."); }
+            finally {
+                sendBtn.disabled = false;
+                sendBtn.innerText = "🚀 Zapisz wynik gracza";
+            }
+        }
+
+        function resetGame() {
+            if(confirm("Czy na pewno zakończyć sesję? To wyzeruje zegar.")) {
+                clearInterval(timerInterval);
+                startTime = null;
+                document.getElementById('timerDisplay').innerText = "00:00";
+                document.getElementById('timeScore').value = "";
+                document.getElementById('articles').innerHTML = "<i>Zacznij nową sesję...</i>";
+                document.getElementById('resetBtn').style.display = "none";
+            }
         }
 
         async function loadTable() {
             try {
                 const res = await fetch(SCRIPT_URL);
                 const data = await res.json();
-                
-                // Sortowanie: Najpierw po Punkcie z kolumny G (indeks 6), 
-                // jeśli puste (nowe rekordy), idą na dół.
-                data.sort((a, b) => (a[6] || 999) - (b[6] || 999));
+                data.sort((a, b) => (parseFloat(a[6]) || 999) - (parseFloat(b[6]) || 999));
 
                 let rows = "";
                 data.forEach((r) => {
-                    // r[1]: Imię, r[2]: Kliknięcia, r[3]: Czas, r[4]: Start, r[5]: Meta, r[6]: Punkty
+                    if(!r[1]) return;
                     rows += `<tr>
                         <td class="rank">${r[6] || "-"}</td>
                         <td>${r[1]}</td>
@@ -156,7 +177,7 @@
                     </tr>`;
                 });
                 document.getElementById('tableBody').innerHTML = rows;
-            } catch (e) { console.error("Błąd ładowania."); }
+            } catch (e) { console.error("Tabela jest aktualnie niedostępna."); }
             finally { document.getElementById('loader').style.display = "none"; }
         }
     </script>
